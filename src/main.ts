@@ -180,6 +180,9 @@ class DynamicExplorerView extends ItemView {
 			itemEl.style.alignItems = 'center';
 			itemEl.style.gap = '6px';
 
+			// Сохраняем путь в дата-атрибут, чтобы мы могли легко найти этот элемент в DOM
+			itemEl.setAttr('data-path', child.path);
+
 			const iconSpan = itemEl.createSpan({ cls: 'nav-file-icon' });
 			const textSpan = itemEl.createSpan({ cls: 'nav-file-title-content' });
 
@@ -236,6 +239,7 @@ class DynamicExplorerView extends ItemView {
 
 		menu.addSeparator();
 
+		// Создание новой заметки с автоматическим переименованием
 		menu.addItem((item: MenuItem) => {
 			item.setTitle('Новая заметка')
 				.setIcon('file-plus')
@@ -248,12 +252,28 @@ class DynamicExplorerView extends ItemView {
 						fileName = `${basePath}Без названия ${counter++}.md`;
 					}
 
+					// 1. Если создаем внутри другой папки, спускаемся в неё, чтобы сразу увидеть созданный файл
+					if (currentDir instanceof TFolder && this.currentFolder !== currentDir) {
+						this.currentFolder = currentDir;
+					}
+
 					const newFile = await this.app.vault.create(fileName, '');
-					const leaf = this.app.workspace.getLeaf(false);
-					await leaf.openFile(newFile);
+					
+					// Обновляем вид, чтобы элемент отрисовался в DOM
+					this.updateView();
+
+					// Находим созданный элемент в DOM и запускаем для него инлайн-редактирование
+					setTimeout(() => {
+						const createdEl = this.containerEl.querySelector(`[data-path="${newFile.path}"]`);
+						const titleSpan = createdEl?.querySelector('.nav-file-title-content') as HTMLElement;
+						if (titleSpan) {
+							this.inlineRename(titleSpan, newFile);
+						}
+					}, 50);
 				});
 		});
 
+		// Создание новой папки с автоматическим переименованием
 		menu.addItem((item: MenuItem) => {
 			item.setTitle('Новая папка')
 				.setIcon('folder-plus')
@@ -268,7 +288,23 @@ class DynamicExplorerView extends ItemView {
 						folderPath = `${basePath}${folderName}`;
 					}
 
-					await this.app.vault.createFolder(folderPath);
+					if (currentDir instanceof TFolder && this.currentFolder !== currentDir) {
+						this.currentFolder = currentDir;
+					}
+
+					const newFolder = await this.app.vault.createFolder(folderPath);
+					
+					// Обновляем вид
+					this.updateView();
+
+					// Запускаем инлайн-редактирование для новой папки
+					setTimeout(() => {
+						const createdEl = this.containerEl.querySelector(`[data-path="${newFolder.path}"]`);
+						const titleSpan = createdEl?.querySelector('.nav-file-title-content') as HTMLElement;
+						if (titleSpan) {
+							this.inlineRename(titleSpan, newFolder);
+						}
+					}, 50);
 				});
 		});
 
