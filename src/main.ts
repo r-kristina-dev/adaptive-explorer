@@ -1,21 +1,43 @@
-import { Plugin, ItemView, WorkspaceLeaf, TFile, TFolder, TAbstractFile, setIcon, Menu, MenuItem } from 'obsidian';
+import { 
+	Plugin, 
+	ItemView, 
+	WorkspaceLeaf, 
+	TFile, 
+	TFolder, 
+	TAbstractFile, 
+	setIcon, 
+	Menu, 
+	MenuItem, 
+	Modal, 
+	PluginSettingTab, 
+	Setting 
+} from 'obsidian';
+
+interface DynamicExplorerSettings {
+	confirmDelete: boolean;
+}
+
+const DEFAULT_SETTINGS: DynamicExplorerSettings = {
+	confirmDelete: true
+};
 
 const DYNAMIC_EXPLORER_VIEW_TYPE = 'dynamic-folder-explorer';
 
 export default class DynamicExplorerPlugin extends Plugin {
+	settings!: DynamicExplorerSettings;
+
 	async onload() {
-		// 1. Регистрируем кастомный View
+		await this.loadSettings();
+
 		this.registerView(
 			DYNAMIC_EXPLORER_VIEW_TYPE,
-			(leaf) => new DynamicExplorerView(leaf)
+			(leaf) => new DynamicExplorerView(leaf, this)
 		);
 
-		// 2. Добавляем иконку в левую панель (рибон) для открытия нашего вида
 		this.addRibbonIcon('folder-kanban', 'Открыть динамический проводник', () => {
 			this.activateView();
 		});
 
-		// 3. Добавляем команду для открытия через палитру команд
 		this.addCommand({
 			id: 'open-dynamic-explorer',
 			name: 'Открыть динамический проводник',
@@ -23,22 +45,26 @@ export default class DynamicExplorerPlugin extends Plugin {
 				this.activateView();
 			},
 		});
+
+		// Регистрируем вкладку настроек в Obsidian
+		this.addSettingTab(new DynamicExplorerSettingTab(this.app, this));
 	}
 
-	async onunload() {
-		// Очистка при выключении плагина
+	async loadSettings() {
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+	}
+
+	async saveSettings() {
+		await this.saveData(this.settings);
 	}
 
 	async activateView() {
 		const { workspace } = this.app;
-		let leaf: WorkspaceLeaf | null | undefined = null; // Добавили | undefined
-		const leaves = workspace.getLeavesOfType(DYNAMIC_EXPLORER_VIEW_TYPE);
+		let leaf = workspace.getLeavesOfType(DYNAMIC_EXPLORER_VIEW_TYPE)[0];
 
-		if (leaves.length > 0) {
-			leaf = leaves[0];
-		} else {
-			leaf = workspace.getLeftLeaf(false);
-			await leaf?.setViewState({ type: DYNAMIC_EXPLORER_VIEW_TYPE, active: true });
+		if (!leaf) {
+			leaf = workspace.getLeftLeaf(false)!;
+			await leaf.setViewState({ type: DYNAMIC_EXPLORER_VIEW_TYPE, active: true });
 		}
 
 		if (leaf) {
@@ -47,11 +73,104 @@ export default class DynamicExplorerPlugin extends Plugin {
 	}
 }
 
+// --- МОДАЛЬНОЕ ОКНО ПОДТВЕРЖДЕНИЯ УДАЛЕНИЯ ---
+class ConfirmDeleteModal extends Modal {
+	target: TAbstractFile;
+	plugin: DynamicExplorerPlugin;
+	onConfirm: () => void;
+
+	constructor(app: any, plugin: DynamicExplorerPlugin, target: TAbstractFile, onConfirm: () => void) {
+		super(app);
+		this.plugin = plugin;
+		this.target = target;
+		this.onConfirm = onConfirm;
+	}
+
+	onOpen() {
+		const { contentEl } = this;
+		contentEl.empty();
+
+		contentEl.createEl('h3', { text: 'Удаление элемента' });
+		contentEl.createEl('p', { 
+			text: `Вы уверены, что хотите удалить "${this.target.name}"?` 
+		});
+
+		// Чекбокс "Больше не показывать"
+		const dontShowContainer = contentEl.createDiv({ cls: 'confirm-delete-checkbox' });
+		dontShowContainer.style.margin = '16px 0';
+		dontShowContainer.style.display = 'flex';
+		dontShowContainer.style.alignItems = 'center';
+		dontShowContainer.style.gap = '8px';
+
+		const checkbox = dontShowContainer.createEl('input', { type: 'checkbox' });
+		const label = dontShowContainer.createEl('label', { text: 'Больше не показывать это предупреждение' });
+		label.style.cursor = 'pointer';
+		label.onclick = () => checkbox.click();
+
+		// Кнопки управления
+		const buttonContainer = contentEl.createDiv({ cls: 'modal-button-container' });
+		buttonContainer.style.display = 'flex';
+		buttonContainer.style.justifyContent = 'flex-end';
+		buttonContainer.style.gap = '8px';
+
+		const cancelBtn = buttonContainer.createEl('button', { text: 'Отмена' });
+		cancelBtn.onclick = () => this.close();
+
+		const deleteBtn = buttonContainer.createEl('button', { 
+			text: 'Удалить', 
+			cls: 'mod-warning' 
+		});
+
+		deleteBtn.onclick = async () => {
+			if (checkbox.checked) {
+				this.plugin.settings.confirmDelete = false;
+				await this.plugin.saveSettings();
+			}
+			this.onConfirm();
+			this.close();
+		};
+	}
+
+	onClose() {
+		this.contentEl.empty();
+	}
+}
+
+// --- ВКЛАДКА НАСТРОЕК ПЛАГИНА ---
+class DynamicExplorerSettingTab extends PluginSettingTab {
+	plugin: DynamicExplorerPlugin;
+
+	constructor(app: any, plugin: DynamicExplorerPlugin) {
+		super(app, plugin);
+		this.plugin = plugin;
+	}
+
+	display(): void {
+		const { containerEl } = this;
+		containerEl.empty();
+
+		new Setting(containerEl)
+			.setName('Показывать предупреждение при удалении')
+			.setDesc('Запрашивать подтверждение перед перемещением файлов или папок в корзину.')
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.confirmDelete)
+					.onChange(async (value) => {
+						this.plugin.settings.confirmDelete = value;
+						await this.plugin.saveSettings();
+					})
+			);
+	}
+}
+
+// --- ОСНОВНОЙ ВЬЮ ПРОВОДНИКА ---
 class DynamicExplorerView extends ItemView {
 	currentFolder: TFolder | null = null;
+	plugin: DynamicExplorerPlugin;
 
-	constructor(leaf: WorkspaceLeaf) {
+	constructor(leaf: WorkspaceLeaf, plugin: DynamicExplorerPlugin) {
 		super(leaf);
+		this.plugin = plugin;
 	}
 
 	getViewType(): string {
@@ -180,7 +299,6 @@ class DynamicExplorerView extends ItemView {
 			itemEl.style.alignItems = 'center';
 			itemEl.style.gap = '6px';
 
-			// Сохраняем путь в дата-атрибут, чтобы мы могли легко найти этот элемент в DOM
 			itemEl.setAttr('data-path', child.path);
 
 			const iconSpan = itemEl.createSpan({ cls: 'nav-file-icon' });
@@ -219,27 +337,7 @@ class DynamicExplorerView extends ItemView {
 			? target 
 			: (target instanceof TFile ? target.parent : this.currentFolder) || this.app.vault.getRoot();
 
-		if (target && textSpan) {
-			menu.addItem((item: MenuItem) => {
-				item.setTitle('Переименовать')
-					.setIcon('pencil')
-					.onClick(() => {
-						this.inlineRename(textSpan, target);
-					});
-			});
-
-			menu.addItem((item: MenuItem) => {
-				item.setTitle('Удалить')
-					.setIcon('trash')
-					.onClick(async () => {
-						await this.app.vault.trash(target, true);
-					});
-			});
-		}
-
-		menu.addSeparator();
-
-		// Создание новой заметки с автоматическим переименованием
+		// 1. Создание элементов
 		menu.addItem((item: MenuItem) => {
 			item.setTitle('Новая заметка')
 				.setIcon('file-plus')
@@ -252,17 +350,13 @@ class DynamicExplorerView extends ItemView {
 						fileName = `${basePath}Без названия ${counter++}.md`;
 					}
 
-					// 1. Если создаем внутри другой папки, спускаемся в неё, чтобы сразу увидеть созданный файл
 					if (currentDir instanceof TFolder && this.currentFolder !== currentDir) {
 						this.currentFolder = currentDir;
 					}
 
 					const newFile = await this.app.vault.create(fileName, '');
-					
-					// Обновляем вид, чтобы элемент отрисовался в DOM
 					this.updateView();
 
-					// Находим созданный элемент в DOM и запускаем для него инлайн-редактирование
 					setTimeout(() => {
 						const createdEl = this.containerEl.querySelector(`[data-path="${newFile.path}"]`);
 						const titleSpan = createdEl?.querySelector('.nav-file-title-content') as HTMLElement;
@@ -273,7 +367,6 @@ class DynamicExplorerView extends ItemView {
 				});
 		});
 
-		// Создание новой папки с автоматическим переименованием
 		menu.addItem((item: MenuItem) => {
 			item.setTitle('Новая папка')
 				.setIcon('folder-plus')
@@ -293,11 +386,8 @@ class DynamicExplorerView extends ItemView {
 					}
 
 					const newFolder = await this.app.vault.createFolder(folderPath);
-					
-					// Обновляем вид
 					this.updateView();
 
-					// Запускаем инлайн-редактирование для новой папки
 					setTimeout(() => {
 						const createdEl = this.containerEl.querySelector(`[data-path="${newFolder.path}"]`);
 						const titleSpan = createdEl?.querySelector('.nav-file-title-content') as HTMLElement;
@@ -308,10 +398,43 @@ class DynamicExplorerView extends ItemView {
 				});
 		});
 
+		// 2. Переименование (если выбран конкретный объект)
+		if (target && textSpan) {
+			menu.addSeparator();
+
+			menu.addItem((item: MenuItem) => {
+				item.setTitle('Переименовать')
+					.setIcon('pencil')
+					.onClick(() => {
+						this.inlineRename(textSpan, target);
+					});
+			});
+		}
+
+		// 3. Удаление — в самом низу и отдельно
+		if (target) {
+			menu.addSeparator();
+
+			menu.addItem((item: MenuItem) => {
+				item.setTitle('Удалить')
+					.setIcon('trash')
+					.onClick(() => {
+						const doDelete = async () => {
+							await this.app.vault.trash(target, true);
+						};
+
+						if (this.plugin.settings.confirmDelete) {
+							new ConfirmDeleteModal(this.app, this.plugin, target, doDelete).open();
+						} else {
+							doDelete();
+						}
+					});
+			});
+		}
+
 		menu.showAtPosition({ x: event.clientX, y: event.clientY });
 	}
 
-	// Метод inline-переименования
 	inlineRename(textSpan: HTMLElement, target: TAbstractFile) {
 		const oldName = target instanceof TFile ? target.basename : target.name;
 		
