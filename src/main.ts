@@ -89,7 +89,6 @@ class DynamicExplorerView extends ItemView {
 		container.empty();
 		container.addClass('dynamic-folder-explorer');
 
-		// Определяем текущую папку
 		const activeFile = this.app.workspace.getActiveFile();
 		if (activeFile && !this.currentFolder) {
 			this.currentFolder = activeFile.parent;
@@ -107,7 +106,7 @@ class DynamicExplorerView extends ItemView {
 		headerEl.style.padding = '8px';
 		headerEl.style.borderBottom = '1px solid var(--background-modifier-border)';
 
-		// 1. Кнопка «Вверх» (слева)
+		// 1. Кнопка «Вверх»
 		const upBtn = headerEl.createEl('button', { 
 			cls: 'clickable-icon',
 			attr: { 'aria-label': 'На уровень выше' } 
@@ -120,7 +119,7 @@ class DynamicExplorerView extends ItemView {
 			}
 		};
 
-		// 2. Название текущей папки / хранилища (в центре, забирает свободное место)
+		// 2. Название папки / хранилища (в центре)
 		const folderNameText = this.currentFolder.isRoot() 
 			? (this.app.vault.getName() || 'Корень хранилища') 
 			: this.currentFolder.name;
@@ -131,15 +130,15 @@ class DynamicExplorerView extends ItemView {
 		titleSpan.style.overflow = 'hidden';
 		titleSpan.style.textOverflow = 'ellipsis';
 		titleSpan.style.whiteSpace = 'nowrap';
-		titleSpan.style.flex = '1'; // Занимает всё доступное пространство между кнопками
+		titleSpan.style.flex = '1';
 
-		// 3. Кнопка «Домой» (прижата к правому краю)
+		// 3. Кнопка «Домой» (прижата вправо)
 		const homeBtn = headerEl.createEl('button', { 
 			cls: 'clickable-icon',
 			attr: { 'aria-label': 'Корень хранилища' } 
 		});
 		setIcon(homeBtn, 'home');
-		homeBtn.style.marginLeft = 'auto'; // Принудительно толкает кнопку в самый правый край
+		homeBtn.style.marginLeft = 'auto';
 		homeBtn.onclick = () => {
 			this.currentFolder = this.app.vault.getRoot();
 			this.updateView();
@@ -157,7 +156,6 @@ class DynamicExplorerView extends ItemView {
 
 		if (!this.currentFolder) return;
 
-		// Контекстное меню по клику на пустое место
 		listContainer.oncontextmenu = (e: MouseEvent) => {
 			e.preventDefault();
 			this.showContextMenu(e, null);
@@ -203,7 +201,7 @@ class DynamicExplorerView extends ItemView {
 			itemEl.oncontextmenu = (e: MouseEvent) => {
 				e.preventDefault();
 				e.stopPropagation();
-				this.showContextMenu(e, child);
+				this.showContextMenu(e, child, textSpan);
 			};
 
 			itemEl.onmouseenter = () => itemEl.style.backgroundColor = 'var(--background-modifier-hover)';
@@ -211,20 +209,19 @@ class DynamicExplorerView extends ItemView {
 		}
 	}
 
-	showContextMenu(event: MouseEvent, target: TFile | TFolder | TAbstractFile | null) {
+	showContextMenu(event: MouseEvent, target: TFile | TFolder | TAbstractFile | null, textSpan?: HTMLElement) {
 		const menu = new Menu();
 
 		const currentDir = target instanceof TFolder 
 			? target 
 			: (target instanceof TFile ? target.parent : this.currentFolder) || this.app.vault.getRoot();
 
-		if (target) {
+		if (target && textSpan) {
 			menu.addItem((item: MenuItem) => {
 				item.setTitle('Переименовать')
 					.setIcon('pencil')
 					.onClick(() => {
-						//@ts-ignore
-						this.app.fileManager.promptForRename(target);
+						this.inlineRename(textSpan, target);
 					});
 			});
 
@@ -276,5 +273,61 @@ class DynamicExplorerView extends ItemView {
 		});
 
 		menu.showAtPosition({ x: event.clientX, y: event.clientY });
+	}
+
+	// Метод inline-переименования
+	inlineRename(textSpan: HTMLElement, target: TAbstractFile) {
+		const oldName = target instanceof TFile ? target.basename : target.name;
+		
+		const inputEl = document.createElement('input');
+		inputEl.type = 'text';
+		inputEl.value = oldName;
+		inputEl.style.width = '100%';
+		inputEl.style.fontSize = 'inherit';
+		inputEl.style.fontFamily = 'inherit';
+		inputEl.style.border = '1px solid var(--interactive-accent)';
+		inputEl.style.borderRadius = '3px';
+		inputEl.style.background = 'var(--background-primary)';
+		inputEl.style.color = 'var(--text-normal)';
+		inputEl.style.padding = '0 4px';
+
+		textSpan.replaceWith(inputEl);
+		inputEl.focus();
+		inputEl.select();
+
+		let isSaved = false;
+
+		const saveRename = async () => {
+			if (isSaved) return;
+			isSaved = true;
+
+			const newName = inputEl.value.trim();
+
+			if (newName && newName !== oldName) {
+				const parentPath = target.parent?.path === '/' ? '' : `${target.parent?.path}/`;
+				const ext = target instanceof TFile ? (target.extension ? `.${target.extension}` : '') : '';
+				const newPath = `${parentPath}${newName}${ext}`;
+
+				try {
+					await this.app.fileManager.renameFile(target, newPath);
+				} catch (err) {
+					console.error('Ошибка переименования:', err);
+				}
+			}
+
+			this.updateView();
+		};
+
+		inputEl.onblur = () => saveRename();
+		inputEl.onkeydown = (e: KeyboardEvent) => {
+			if (e.key === 'Enter') {
+				e.preventDefault();
+				saveRename();
+			} else if (e.key === 'Escape') {
+				e.preventDefault();
+				isSaved = true;
+				this.updateView();
+			}
+		};
 	}
 }
