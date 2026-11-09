@@ -208,6 +208,12 @@ class DynamicExplorerView extends ItemView {
 		container.empty();
 		container.addClass('dynamic-folder-explorer');
 
+		// Делаем корневой контейнер вьюхи флекс-колонкой, 
+		// чтобы список мог занять всё оставшееся пространство под шапкой
+		container.style.display = 'flex';
+		container.style.flexDirection = 'column';
+		container.style.height = '100%';
+
 		const activeFile = this.app.workspace.getActiveFile();
 		if (activeFile && !this.currentFolder) {
 			this.currentFolder = activeFile.parent;
@@ -224,6 +230,7 @@ class DynamicExplorerView extends ItemView {
 		headerEl.style.gap = '8px';
 		headerEl.style.padding = '8px';
 		headerEl.style.borderBottom = '1px solid var(--background-modifier-border)';
+		headerEl.style.flexShrink = '0'; // Шапка не сжимается
 
 		// 1. Кнопка «Вверх»
 		const upBtn = headerEl.createEl('button', { 
@@ -270,14 +277,21 @@ class DynamicExplorerView extends ItemView {
 		const existingList = container.querySelector('.file-list-container');
 		if (existingList) existingList.remove();
 
+		// Контейнер списка теперь занимает всю оставшуюся высоту под шапкой
 		const listContainer = container.createDiv({ cls: 'file-list-container' });
 		listContainer.style.padding = '8px';
+		listContainer.style.flex = '1';
+		listContainer.style.overflowY = 'auto';
 
 		if (!this.currentFolder) return;
 
+		// ПКМ в любой пустой области вызовет контекстное меню создания
 		listContainer.oncontextmenu = (e: MouseEvent) => {
-			e.preventDefault();
-			this.showContextMenu(e, null);
+			// Открываем меню только если кликнули по пустому месту, а не по конкретному файлу
+			if (e.target === listContainer || (e.target as HTMLElement).classList.contains('tree-item-children')) {
+				e.preventDefault();
+				this.showContextMenu(e, null);
+			}
 		};
 
 		const childrenContainer = listContainer.createDiv({ cls: 'tree-item-children' });
@@ -321,7 +335,7 @@ class DynamicExplorerView extends ItemView {
 
 			itemEl.oncontextmenu = (e: MouseEvent) => {
 				e.preventDefault();
-				e.stopPropagation();
+				e.stopPropagation(); // Предотвращаем всплытие, чтобы срабатывало меню файла, а не общего пространства
 				this.showContextMenu(e, child, textSpan);
 			};
 
