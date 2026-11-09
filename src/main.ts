@@ -107,20 +107,32 @@ class DynamicExplorerView extends ItemView {
 		headerEl.style.padding = '8px';
 		headerEl.style.borderBottom = '1px solid var(--background-modifier-border)';
 
-		// Кнопка «Домой» (в корень хранилища)
-		const homeBtn = headerEl.createEl('button', { text: '🏠 Домой' });
-		homeBtn.onclick = () => {
-			this.currentFolder = this.app.vault.getRoot();
-			this.renderFolderContents(container);
-		};
+		// Кнопка «Вверх» (на уровень выше)
+		const upBtn = headerEl.createEl('button', { 
+			cls: 'clickable-icon',
+			attr: { 'aria-label': 'На уровень выше' } 
+		});
 
-		// Кнопка «Вверх» (стрелка влево — на уровень выше)
-		const upBtn = headerEl.createEl('button', { text: '⬅️ Вверх' });
+		setIcon(upBtn, 'arrow-left');
+
 		upBtn.onclick = () => {
 			if (this.currentFolder && this.currentFolder.parent) {
 				this.currentFolder = this.currentFolder.parent;
 				this.renderFolderContents(container);
 			}
+		};
+
+		// Кнопка «Домой» (в корень хранилища)
+		const homeBtn = headerEl.createEl('button', { 
+			cls: 'clickable-icon',
+			attr: { 'aria-label': 'Домой' } // Подсказка появится при наведении мыши
+		});
+
+		setIcon(homeBtn, 'home');
+
+		homeBtn.onclick = () => {
+			this.currentFolder = this.app.vault.getRoot();
+			this.renderFolderContents(container);
 		};
 
 		// Определяем текущую папку на основе активного файла, если она не задана вручную
