@@ -1,11 +1,9 @@
 {
-	"id": "kit-lib",
-	"name": "Kit Lib",
+	"id": "folder-focus",
+	"name": "Folder Focus",
 	"version": "1.0.0",
 	"minAppVersion": "1.0.0",
-	"description": "Plugin for bilding plugin componrnt.",
+	"description": "An extension for Obsidian's internal file tree that displays only the current folder and its contents relative to the open file..",
 	"author": "Kaharna",
-	"authorUrl": "https://obsidian.md",
-	"fundingUrl": "https://obsidian.md/pricing",
 	"isDesktopOnly": false
 }
