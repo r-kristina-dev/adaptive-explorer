@@ -84,12 +84,23 @@ class DynamicExplorerView extends ItemView {
 
 	updateView() {
 		const container = this.containerEl.children[1] as HTMLElement;
+		if (!container) return; // Защита от null для TypeScript
+
 		container.empty();
 		container.addClass('dynamic-folder-explorer');
 
-		// Шапка с кнопками управления
+		// Определяем текущую папку
+		const activeFile = this.app.workspace.getActiveFile();
+		if (activeFile && !this.currentFolder) {
+			this.currentFolder = activeFile.parent;
+		} else if (!this.currentFolder) {
+			this.currentFolder = this.app.vault.getRoot();
+		}
+
+		// --- ШАПКА ---
 		const headerEl = container.createDiv({ cls: 'nav-header' });
 		headerEl.style.display = 'flex';
+		headerEl.style.alignItems = 'center';
 		headerEl.style.gap = '8px';
 		headerEl.style.padding = '8px';
 		headerEl.style.borderBottom = '1px solid var(--background-modifier-border)';
@@ -103,28 +114,35 @@ class DynamicExplorerView extends ItemView {
 		upBtn.onclick = () => {
 			if (this.currentFolder && this.currentFolder.parent) {
 				this.currentFolder = this.currentFolder.parent;
-				this.renderFolderContents(container);
+				this.updateView();
 			}
 		};
 
 		// Кнопка «Домой»
 		const homeBtn = headerEl.createEl('button', { 
 			cls: 'clickable-icon',
-			attr: { 'aria-label': 'Домой' } 
+			attr: { 'aria-label': 'Корень хранилища' } 
 		});
 		setIcon(homeBtn, 'home');
 		homeBtn.onclick = () => {
 			this.currentFolder = this.app.vault.getRoot();
-			this.renderFolderContents(container);
+			this.updateView();
 		};
 
-		const activeFile = this.app.workspace.getActiveFile();
-		if (activeFile && !this.currentFolder) {
-			this.currentFolder = activeFile.parent;
-		} else if (!this.currentFolder) {
-			this.currentFolder = this.app.vault.getRoot();
-		}
+// Название текущей папки / хранилища прямо в шапке
+		if (!this.currentFolder) return;
 
+		const folderNameText = this.currentFolder.isRoot() 
+			? (this.app.vault.getName() || 'Корень хранилища') 
+			: this.currentFolder.name;
+
+		const titleSpan = headerEl.createSpan({ text: folderNameText });
+		titleSpan.style.fontWeight = '600';
+		titleSpan.style.fontSize = '0.9em';
+		titleSpan.style.overflow = 'hidden';
+		titleSpan.style.textOverflow = 'ellipsis';
+		titleSpan.style.whiteSpace = 'nowrap';
+		
 		this.renderFolderContents(container);
 	}
 
@@ -137,25 +155,12 @@ class DynamicExplorerView extends ItemView {
 
 		if (!this.currentFolder) return;
 
-		// Контекстное меню по клику на пустое место в проводнике (создание файлов/папок)
+		// Контекстное меню по клику на пустое место
 		listContainer.oncontextmenu = (e: MouseEvent) => {
 			e.preventDefault();
 			this.showContextMenu(e, null);
 		};
 
-		// Заголовок текущей папки
-		const titleEl = listContainer.createDiv({ cls: 'folder-title' });
-		titleEl.style.fontWeight = 'bold';
-		titleEl.style.marginBottom = '8px';
-		titleEl.style.display = 'flex';
-		titleEl.style.alignItems = 'center';
-		titleEl.style.gap = '6px';
-		
-		const titleIcon = titleEl.createSpan({ cls: 'nav-file-icon' });
-		setIcon(titleIcon, 'folder');
-		titleEl.createSpan({ text: this.currentFolder.name || 'Корень хранилища' });
-
-		// Содержимое
 		const childrenContainer = listContainer.createDiv({ cls: 'tree-item-children' });
 
 		const sortedChildren = [...this.currentFolder.children].sort((a, b) => {
@@ -183,7 +188,7 @@ class DynamicExplorerView extends ItemView {
 				textSpan.setText(child.name);
 				itemEl.onclick = () => {
 					this.currentFolder = child;
-					this.renderFolderContents(container);
+					this.updateView();
 				};
 			} else if (child instanceof TFile) {
 				setIcon(iconSpan, 'file');
@@ -193,10 +198,9 @@ class DynamicExplorerView extends ItemView {
 				};
 			}
 
-			// Контекстное меню для конкретного файла или папки по ПКМ
 			itemEl.oncontextmenu = (e: MouseEvent) => {
 				e.preventDefault();
-				e.stopPropagation(); // чтобы не всплывало на контейнер
+				e.stopPropagation();
 				this.showContextMenu(e, child);
 			};
 
@@ -205,21 +209,18 @@ class DynamicExplorerView extends ItemView {
 		}
 	}
 
-	// Метод построения контекстного меню
 	showContextMenu(event: MouseEvent, target: TFile | TFolder | TAbstractFile | null) {
-    	const menu = new Menu();
+		const menu = new Menu();
 
 		const currentDir = target instanceof TFolder 
 			? target 
 			: (target instanceof TFile ? target.parent : this.currentFolder) || this.app.vault.getRoot();
 
-		// 1. Действия для существующего файла или папки
 		if (target) {
 			menu.addItem((item: MenuItem) => {
 				item.setTitle('Переименовать')
 					.setIcon('pencil')
 					.onClick(() => {
-						// Вызываем системное модальное окно переименования
 						//@ts-ignore
 						this.app.fileManager.promptForRename(target);
 					});
@@ -236,7 +237,6 @@ class DynamicExplorerView extends ItemView {
 
 		menu.addSeparator();
 
-		// 2. Создание новой заметки
 		menu.addItem((item: MenuItem) => {
 			item.setTitle('Новая заметка')
 				.setIcon('file-plus')
@@ -245,7 +245,6 @@ class DynamicExplorerView extends ItemView {
 					let fileName = `${basePath}Без названия.md`;
 					let counter = 1;
 
-					// Генерируем уникальное имя, если файл уже существует
 					while (this.app.vault.getAbstractFileByPath(fileName)) {
 						fileName = `${basePath}Без названия ${counter++}.md`;
 					}
@@ -256,7 +255,6 @@ class DynamicExplorerView extends ItemView {
 				});
 		});
 
-		// 3. Создание новой папки
 		menu.addItem((item: MenuItem) => {
 			item.setTitle('Новая папка')
 				.setIcon('folder-plus')
