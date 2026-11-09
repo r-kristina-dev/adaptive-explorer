@@ -84,7 +84,7 @@ class DynamicExplorerView extends ItemView {
 
 	updateView() {
 		const container = this.containerEl.children[1] as HTMLElement;
-		if (!container) return; // Защита от null для TypeScript
+		if (!container) return;
 
 		container.empty();
 		container.addClass('dynamic-folder-explorer');
@@ -97,6 +97,8 @@ class DynamicExplorerView extends ItemView {
 			this.currentFolder = this.app.vault.getRoot();
 		}
 
+		if (!this.currentFolder) return;
+
 		// --- ШАПКА ---
 		const headerEl = container.createDiv({ cls: 'nav-header' });
 		headerEl.style.display = 'flex';
@@ -105,7 +107,7 @@ class DynamicExplorerView extends ItemView {
 		headerEl.style.padding = '8px';
 		headerEl.style.borderBottom = '1px solid var(--background-modifier-border)';
 
-		// Кнопка «Вверх»
+		// 1. Кнопка «Вверх» (слева)
 		const upBtn = headerEl.createEl('button', { 
 			cls: 'clickable-icon',
 			attr: { 'aria-label': 'На уровень выше' } 
@@ -118,20 +120,7 @@ class DynamicExplorerView extends ItemView {
 			}
 		};
 
-		// Кнопка «Домой»
-		const homeBtn = headerEl.createEl('button', { 
-			cls: 'clickable-icon',
-			attr: { 'aria-label': 'Корень хранилища' } 
-		});
-		setIcon(homeBtn, 'home');
-		homeBtn.onclick = () => {
-			this.currentFolder = this.app.vault.getRoot();
-			this.updateView();
-		};
-
-// Название текущей папки / хранилища прямо в шапке
-		if (!this.currentFolder) return;
-
+		// 2. Название текущей папки / хранилища (в центре, забирает свободное место)
 		const folderNameText = this.currentFolder.isRoot() 
 			? (this.app.vault.getName() || 'Корень хранилища') 
 			: this.currentFolder.name;
@@ -142,7 +131,20 @@ class DynamicExplorerView extends ItemView {
 		titleSpan.style.overflow = 'hidden';
 		titleSpan.style.textOverflow = 'ellipsis';
 		titleSpan.style.whiteSpace = 'nowrap';
-		
+		titleSpan.style.flex = '1'; // Занимает всё доступное пространство между кнопками
+
+		// 3. Кнопка «Домой» (прижата к правому краю)
+		const homeBtn = headerEl.createEl('button', { 
+			cls: 'clickable-icon',
+			attr: { 'aria-label': 'Корень хранилища' } 
+		});
+		setIcon(homeBtn, 'home');
+		homeBtn.style.marginLeft = 'auto'; // Принудительно толкает кнопку в самый правый край
+		homeBtn.onclick = () => {
+			this.currentFolder = this.app.vault.getRoot();
+			this.updateView();
+		};
+
 		this.renderFolderContents(container);
 	}
 
