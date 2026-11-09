@@ -1,114 +1,188 @@
 import {
-	Editor,
-	MarkdownView,
-	MarkdownFileInfo,
-	Modal,
-	Notice,
 	Plugin,
+	ItemView,
+	WorkspaceLeaf,
+	TFile,
+	TFolder,
+	setIcon,
 } from 'obsidian';
-import {
-	DEFAULT_SETTINGS,
-	MyPluginSettings,
-	SampleSettingTab,
-} from './settings.js';
 
-// Remember to rename these classes and interfaces!
+const DYNAMIC_EXPLORER_VIEW_TYPE = 'dynamic-folder-explorer';
 
-export default class MyPlugin extends Plugin {
-	settings!: MyPluginSettings;
-
+export default class DynamicExplorerPlugin extends Plugin {
 	async onload() {
-		await this.loadSettings();
+		// 1. Регистрируем кастомный View
+		this.registerView(
+			DYNAMIC_EXPLORER_VIEW_TYPE,
+			(leaf) => new DynamicExplorerView(leaf)
+		);
 
-		// This creates an icon in the left ribbon.
-		this.addRibbonIcon('dice', 'Sample', (_evt: MouseEvent) => {
-			// Called when the user clicks the icon.
-			new Notice('This is a notice!');
+		// 2. Добавляем иконку в левую панель (рибон) для открытия нашего вида
+		this.addRibbonIcon('folder-kanban', 'Открыть динамический проводник', () => {
+			this.activateView();
 		});
 
-		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
-		const statusBarItemEl = this.addStatusBarItem();
-		statusBarItemEl.setText('Status bar text');
-
-		// This adds a simple command that can be triggered anywhere
+		// 3. Добавляем команду для открытия через палитру команд
 		this.addCommand({
-			id: 'open-modal-simple',
-			name: 'Open modal (simple)',
+			id: 'open-dynamic-explorer',
+			name: 'Открыть динамический проводник',
 			callback: () => {
-				new SampleModal(this.app).open();
+				this.activateView();
 			},
 		});
-		// This adds an editor command that can perform some operation on the current editor instance
-		this.addCommand({
-			id: 'replace-selected',
-			name: 'Replace selected content',
-			editorCallback: (
-				editor: Editor,
-				_ctx: MarkdownView | MarkdownFileInfo,
-			) => {
-				editor.replaceSelection('Sample editor command');
-			},
-		});
-		// This adds a complex command that can check whether the current state of the app allows execution of the command
-		this.addCommand({
-			id: 'open-modal-complex',
-			name: 'Open modal (complex)',
-			checkCallback: (checking: boolean) => {
-				// Conditions to check
-				const markdownView =
-					this.app.workspace.getActiveViewOfType(MarkdownView);
-				if (markdownView) {
-					// If checking is true, we're simply "checking" if the command can be run.
-					// If checking is false, then we want to actually perform the operation.
-					if (!checking) {
-						new SampleModal(this.app).open();
-					}
-
-					// This command will only show up in Command Palette when the check function returns true
-					return true;
-				}
-				return false;
-			},
-		});
-
-		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new SampleSettingTab(this.app, this));
-
-		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
-		// Using this function will automatically remove the event listener when this plugin is disabled.
-		this.registerDomEvent(activeDocument, 'click', (_evt: MouseEvent) => {
-			new Notice('Click');
-		});
-
-		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-		this.registerInterval(
-			window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000),
-		);
 	}
 
-	onunload() {}
-
-	async loadSettings() {
-		this.settings = Object.assign(
-			{},
-			DEFAULT_SETTINGS,
-			(await this.loadData()) as Partial<MyPluginSettings>,
-		);
+	async onunload() {
+		// Очистка при выключении плагина
 	}
 
-	async saveSettings() {
-		await this.saveData(this.settings);
+	async activateView() {
+		const { workspace } = this.app;
+		let leaf: WorkspaceLeaf | null | undefined = null; // Добавили | undefined
+		const leaves = workspace.getLeavesOfType(DYNAMIC_EXPLORER_VIEW_TYPE);
+
+		if (leaves.length > 0) {
+			leaf = leaves[0];
+		} else {
+			leaf = workspace.getLeftLeaf(false);
+			await leaf?.setViewState({ type: DYNAMIC_EXPLORER_VIEW_TYPE, active: true });
+		}
+
+		if (leaf) {
+			workspace.revealLeaf(leaf);
+		}
 	}
 }
 
-class SampleModal extends Modal {
-	onOpen() {
-		const { contentEl } = this;
-		contentEl.setText('Woah!');
+class DynamicExplorerView extends ItemView {
+	currentFolder: TFolder | null = null;
+
+	constructor(leaf: WorkspaceLeaf) {
+		super(leaf);
 	}
 
-	onClose() {
-		const { contentEl } = this;
-		contentEl.empty();
+	getViewType(): string {
+		return DYNAMIC_EXPLORER_VIEW_TYPE;
+	}
+
+	getDisplayText(): string {
+		return 'Динамический проводник';
+	}
+
+	async onOpen() {
+		// Перерисовываем вид при изменении активного файла
+		this.registerEvent(
+			this.app.workspace.on('active-leaf-change', () => {
+				this.updateView();
+			})
+		);
+
+		// Перерисовываем, если файлы создаются, удаляются или переименовываются
+		this.registerEvent(
+			this.app.vault.on('rename', () => this.updateView())
+		);
+		this.registerEvent(
+			this.app.vault.on('delete', () => this.updateView())
+		);
+		this.registerEvent(
+			this.app.vault.on('create', () => this.updateView())
+		);
+
+		this.updateView();
+	}
+
+	async onClose() {
+		// Очистка
+	}
+
+	updateView() {
+		const container = this.containerEl.children[1] as HTMLElement;
+		container.empty();
+		container.addClass('dynamic-folder-explorer');
+
+		// Шапка с кнопками управления («Вверх» и «Домой»)
+		const headerEl = container.createDiv({ cls: 'nav-header' });
+		headerEl.style.display = 'flex';
+		headerEl.style.gap = '8px';
+		headerEl.style.padding = '8px';
+		headerEl.style.borderBottom = '1px solid var(--background-modifier-border)';
+
+		// Кнопка «Домой» (в корень хранилища)
+		const homeBtn = headerEl.createEl('button', { text: '🏠 Домой' });
+		homeBtn.onclick = () => {
+			this.currentFolder = this.app.vault.getRoot();
+			this.renderFolderContents(container);
+		};
+
+		// Кнопка «Вверх» (стрелка влево — на уровень выше)
+		const upBtn = headerEl.createEl('button', { text: '⬅️ Вверх' });
+		upBtn.onclick = () => {
+			if (this.currentFolder && this.currentFolder.parent) {
+				this.currentFolder = this.currentFolder.parent;
+				this.renderFolderContents(container);
+			}
+		};
+
+		// Определяем текущую папку на основе активного файла, если она не задана вручную
+		const activeFile = this.app.workspace.getActiveFile();
+		if (activeFile) {
+			this.currentFolder = activeFile.parent;
+		} else if (!this.currentFolder) {
+			this.currentFolder = this.app.vault.getRoot();
+		}
+
+		this.renderFolderContents(container);
+	}
+
+	renderFolderContents(container: HTMLElement) {
+		// Удаляем старый список файлов, если он есть, оставляя шапку
+		const existingList = container.querySelector('.file-list-container');
+		if (existingList) existingList.remove();
+
+		const listContainer = container.createDiv({ cls: 'file-list-container' });
+		listContainer.style.padding = '8px';
+
+		if (!this.currentFolder) return;
+
+		// Заголовок текущей папки
+		const titleEl = listContainer.createDiv({ cls: 'folder-title' });
+		titleEl.style.fontWeight = 'bold';
+		titleEl.style.marginBottom = '8px';
+		titleEl.setText(`📁 ${this.currentFolder.name || 'Корень хранилища'}`);
+
+		// Рендерим содержимое (подпапки и файлы)
+		const childrenContainer = listContainer.createDiv({ cls: 'tree-item-children' });
+
+		// Сначала папки, потом файлы
+		const sortedChildren = [...this.currentFolder.children].sort((a, b) => {
+			const aIsFolder = a instanceof TFolder;
+			const bIsFolder = b instanceof TFolder;
+			if (aIsFolder && !bIsFolder) return -1;
+			if (!aIsFolder && bIsFolder) return 1;
+			return a.name.localeCompare(b.name);
+		});
+
+		for (const child of sortedChildren) {
+			const itemEl = childrenContainer.createDiv({ cls: 'tree-item-self' });
+			itemEl.style.padding = '4px 8px';
+			itemEl.style.cursor = 'pointer';
+			itemEl.style.borderRadius = '4px';
+
+			if (child instanceof TFolder) {
+				itemEl.setText(`📁 ${child.name}`);
+				itemEl.onclick = () => {
+					this.currentFolder = child;
+					this.renderFolderContents(container);
+				};
+			} else if (child instanceof TFile) {
+				itemEl.setText(`📄 ${child.basename}`);
+				itemEl.onclick = () => {
+					this.app.workspace.openLinkText(child.path, '', false);
+				};
+			}
+
+			itemEl.onmouseenter = () => itemEl.style.backgroundColor = 'var(--background-modifier-hover)';
+			itemEl.onmouseleave = () => itemEl.style.backgroundColor = 'transparent';
+		}
 	}
 }
