@@ -1,11 +1,4 @@
-import {
-	Plugin,
-	ItemView,
-	WorkspaceLeaf,
-	TFile,
-	TFolder,
-	setIcon,
-} from 'obsidian';
+import { Plugin, ItemView, WorkspaceLeaf, TFile, TFolder, setIcon, } from 'obsidian';
 
 const DYNAMIC_EXPLORER_VIEW_TYPE = 'dynamic-folder-explorer';
 
@@ -64,6 +57,10 @@ class DynamicExplorerView extends ItemView {
 	getViewType(): string {
 		return DYNAMIC_EXPLORER_VIEW_TYPE;
 	}
+
+	getIcon(): string {
+        return 'folder-git-2'; // Здесь можно указать любую иконку из Lucide (например, 'folder', 'Compass', 'layers' и т.д.)
+    }
 
 	getDisplayText(): string {
 		return 'Динамический проводник';
