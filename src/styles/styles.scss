@@ -1,3 +1,76 @@
-.workspace-ribbon.side-dock-ribbon.mod-primary {
-    background: rgb(39, 48, 30);
+/* --- Dynamic Explorer View Styles --- */
+.dynamic-folder-explorer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+
+  .dynamic-explorer-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+    border-bottom: 1px solid var(--background-modifier-border);
+    flex-shrink: 0;
+
+    .dynamic-explorer-title {
+      font-weight: 600;
+      font-size: 0.9em;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1;
+    }
+
+    .dynamic-explorer-home-btn {
+      margin-left: auto;
+    }
+  }
+
+  .file-list-container {
+    padding: 8px;
+    flex: 1;
+    overflow-y: auto;
+
+    .explorer-item {
+      padding: 4px 8px;
+      cursor: pointer;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+
+      &:hover {
+        background-color: var(--background-modifier-hover);
+      }
+    }
+  }
+}
+
+/* --- Modals & Inputs --- */
+.confirm-delete-checkbox {
+  margin: 16px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  .confirm-delete-label {
+    cursor: pointer;
+  }
+}
+
+.modal-button-container {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.inline-rename-input {
+  width: 100%;
+  font-size: inherit;
+  font-family: inherit;
+  border: 1px solid var(--interactive-accent);
+  border-radius: 3px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  padding: 0 4px;
 }

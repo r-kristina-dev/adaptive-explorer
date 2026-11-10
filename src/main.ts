@@ -95,23 +95,18 @@ class ConfirmDeleteModal extends Modal {
 			text: `Are you sure you want to delete "${this.target.name}"?` 
 		});
 
-		// "Don't show again" checkbox
+		// "Don't show again" checkbox container
 		const dontShowContainer = contentEl.createDiv({ cls: 'confirm-delete-checkbox' });
-		dontShowContainer.style.margin = '16px 0';
-		dontShowContainer.style.display = 'flex';
-		dontShowContainer.style.alignItems = 'center';
-		dontShowContainer.style.gap = '8px';
 
 		const checkbox = dontShowContainer.createEl('input', { type: 'checkbox' });
-		const label = dontShowContainer.createEl('label', { text: "Don't show this warning again" });
-		label.style.cursor = 'pointer';
+		const label = dontShowContainer.createEl('label', { 
+			cls: 'confirm-delete-label', 
+			text: "Don't show this warning again" 
+		});
 		label.onclick = () => checkbox.click();
 
-		// Control buttons
+		// Control buttons container
 		const buttonContainer = contentEl.createDiv({ cls: 'modal-button-container' });
-		buttonContainer.style.display = 'flex';
-		buttonContainer.style.justifyContent = 'flex-end';
-		buttonContainer.style.gap = '8px';
 
 		const cancelBtn = buttonContainer.createEl('button', { text: 'Cancel' });
 		cancelBtn.onclick = () => this.close();
@@ -208,11 +203,6 @@ class DynamicExplorerView extends ItemView {
 		container.empty();
 		container.addClass('dynamic-folder-explorer');
 
-		// Make root container a flex column so the list can take up all remaining space below header
-		container.style.display = 'flex';
-		container.style.flexDirection = 'column';
-		container.style.height = '100%';
-
 		const activeFile = this.app.workspace.getActiveFile();
 		if (activeFile && !this.currentFolder) {
 			this.currentFolder = activeFile.parent;
@@ -223,13 +213,7 @@ class DynamicExplorerView extends ItemView {
 		if (!this.currentFolder) return;
 
 		// --- HEADER ---
-		const headerEl = container.createDiv({ cls: 'nav-header' });
-		headerEl.style.display = 'flex';
-		headerEl.style.alignItems = 'center';
-		headerEl.style.gap = '8px';
-		headerEl.style.padding = '8px';
-		headerEl.style.borderBottom = '1px solid var(--background-modifier-border)';
-		headerEl.style.flexShrink = '0'; // Header won't shrink
+		const headerEl = container.createDiv({ cls: 'dynamic-explorer-header' });
 
 		// 1. "Up" button
 		const upBtn = headerEl.createEl('button', { 
@@ -249,21 +233,17 @@ class DynamicExplorerView extends ItemView {
 			? (this.app.vault.getName() || 'Vault root') 
 			: this.currentFolder.name;
 
-		const titleSpan = headerEl.createSpan({ text: folderNameText });
-		titleSpan.style.fontWeight = '600';
-		titleSpan.style.fontSize = '0.9em';
-		titleSpan.style.overflow = 'hidden';
-		titleSpan.style.textOverflow = 'ellipsis';
-		titleSpan.style.whiteSpace = 'nowrap';
-		titleSpan.style.flex = '1';
+		const titleSpan = headerEl.createSpan({ 
+			cls: 'dynamic-explorer-title', 
+			text: folderNameText 
+		});
 
 		// 3. "Home" button (pinned right)
 		const homeBtn = headerEl.createEl('button', { 
-			cls: 'clickable-icon',
+			cls: 'dynamic-explorer-home-btn clickable-icon',
 			attr: { 'aria-label': 'Vault root' } 
 		});
 		setIcon(homeBtn, 'home');
-		homeBtn.style.marginLeft = 'auto';
 		homeBtn.onclick = () => {
 			this.currentFolder = this.app.vault.getRoot();
 			this.updateView();
@@ -276,17 +256,12 @@ class DynamicExplorerView extends ItemView {
 		const existingList = container.querySelector('.file-list-container');
 		if (existingList) existingList.remove();
 
-		// List container takes up remaining height below header
 		const listContainer = container.createDiv({ cls: 'file-list-container' });
-		listContainer.style.padding = '8px';
-		listContainer.style.flex = '1';
-		listContainer.style.overflowY = 'auto';
 
 		if (!this.currentFolder) return;
 
 		// Right-click in any empty area opens creation context menu
 		listContainer.oncontextmenu = (e: MouseEvent) => {
-			// Open menu only if clicked on empty space, not a specific file
 			if (e.target === listContainer || (e.target as HTMLElement).classList.contains('tree-item-children')) {
 				e.preventDefault();
 				this.showContextMenu(e, null);
@@ -304,14 +279,7 @@ class DynamicExplorerView extends ItemView {
 		});
 
 		for (const child of sortedChildren) {
-			const itemEl = childrenContainer.createDiv({ cls: 'tree-item-self' });
-			itemEl.style.padding = '4px 8px';
-			itemEl.style.cursor = 'pointer';
-			itemEl.style.borderRadius = '4px';
-			itemEl.style.display = 'flex';
-			itemEl.style.alignItems = 'center';
-			itemEl.style.gap = '6px';
-
+			const itemEl = childrenContainer.createDiv({ cls: 'explorer-item' });
 			itemEl.setAttr('data-path', child.path);
 
 			const iconSpan = itemEl.createSpan({ cls: 'nav-file-icon' });
@@ -334,12 +302,9 @@ class DynamicExplorerView extends ItemView {
 
 			itemEl.oncontextmenu = (e: MouseEvent) => {
 				e.preventDefault();
-				e.stopPropagation(); // Prevent bubbling so file menu triggers instead of general space menu
+				e.stopPropagation();
 				this.showContextMenu(e, child, textSpan);
 			};
-
-			itemEl.onmouseenter = () => itemEl.style.backgroundColor = 'var(--background-modifier-hover)';
-			itemEl.onmouseleave = () => itemEl.style.backgroundColor = 'transparent';
 		}
 	}
 
@@ -411,7 +376,7 @@ class DynamicExplorerView extends ItemView {
 				});
 		});
 
-		// 2. Rename (if specific object selected)
+		// 2. Rename
 		if (target && textSpan) {
 			menu.addSeparator();
 
@@ -424,7 +389,7 @@ class DynamicExplorerView extends ItemView {
 			});
 		}
 
-		// 3. Delete - at the bottom separately
+		// 3. Delete
 		if (target) {
 			menu.addSeparator();
 
@@ -454,14 +419,7 @@ class DynamicExplorerView extends ItemView {
 		const inputEl = document.createElement('input');
 		inputEl.type = 'text';
 		inputEl.value = oldName;
-		inputEl.style.width = '100%';
-		inputEl.style.fontSize = 'inherit';
-		inputEl.style.fontFamily = 'inherit';
-		inputEl.style.border = '1px solid var(--interactive-accent)';
-		inputEl.style.borderRadius = '3px';
-		inputEl.style.background = 'var(--background-primary)';
-		inputEl.style.color = 'var(--text-normal)';
-		inputEl.style.padding = '0 4px';
+		inputEl.addClass('inline-rename-input');
 
 		textSpan.replaceWith(inputEl);
 		inputEl.focus();
