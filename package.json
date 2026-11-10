@@ -1,7 +1,7 @@
 {
-	"name": "folder-focus",
-	"version": "1.0.0",
-	"description": "This is a sample plugin for Obsidian (https://obsidian.md)",
+	"name": "adaptive-explorer",
+	"version": "2.0.0",
+	"description": "An adaptive file explorer that automatically drills down into the folder structure of your active note, keeping your sidebar clean and hyper-focused.",
 	"main": "main.js",
 	"type": "module",
 	"scripts": {

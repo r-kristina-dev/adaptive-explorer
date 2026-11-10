@@ -1,9 +1,11 @@
 {
-	"id": "folder-focus",
-	"name": "Folder Focus",
-	"version": "1.0.0",
+	"id": "adaptive-explorer",
+	"name": "Adaptive Explorer",
+	"version": "2.0.0",
 	"minAppVersion": "1.0.0",
-	"description": "An extension for Obsidian's internal file tree that displays only the current folder and its contents relative to the open file..",
-	"author": "Kaharna",
+	"description": "An adaptive file explorer that automatically drills down into the folder structure of your active note, keeping your sidebar clean and hyper-focused.",
+	"author": "Kdev Rir",
+	"authorUrl": "https://sideways-capri-0dd.notion.site/Kdev-Rir-414c306e31d280b6bbdbfed420c9876f",
+	"fundingUrl": "https://boosty.to/kdev_rir",
 	"isDesktopOnly": false
 }
