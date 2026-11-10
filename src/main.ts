@@ -34,19 +34,19 @@ export default class DynamicExplorerPlugin extends Plugin {
 			(leaf) => new DynamicExplorerView(leaf, this)
 		);
 
-		this.addRibbonIcon('folder-kanban', 'Открыть динамический проводник', () => {
+		this.addRibbonIcon('folder-kanban', 'Open dynamic explorer', () => {
 			this.activateView();
 		});
 
 		this.addCommand({
 			id: 'open-dynamic-explorer',
-			name: 'Открыть динамический проводник',
+			name: 'Open dynamic explorer',
 			callback: () => {
 				this.activateView();
 			},
 		});
 
-		// Регистрируем вкладку настроек в Obsidian
+		// Register settings tab in Obsidian
 		this.addSettingTab(new DynamicExplorerSettingTab(this.app, this));
 	}
 
@@ -73,7 +73,7 @@ export default class DynamicExplorerPlugin extends Plugin {
 	}
 }
 
-// --- МОДАЛЬНОЕ ОКНО ПОДТВЕРЖДЕНИЯ УДАЛЕНИЯ ---
+// --- CONFIRM DELETE MODAL ---
 class ConfirmDeleteModal extends Modal {
 	target: TAbstractFile;
 	plugin: DynamicExplorerPlugin;
@@ -90,12 +90,12 @@ class ConfirmDeleteModal extends Modal {
 		const { contentEl } = this;
 		contentEl.empty();
 
-		contentEl.createEl('h3', { text: 'Удаление элемента' });
+		contentEl.createEl('h3', { text: 'Delete item' });
 		contentEl.createEl('p', { 
-			text: `Вы уверены, что хотите удалить "${this.target.name}"?` 
+			text: `Are you sure you want to delete "${this.target.name}"?` 
 		});
 
-		// Чекбокс "Больше не показывать"
+		// "Don't show again" checkbox
 		const dontShowContainer = contentEl.createDiv({ cls: 'confirm-delete-checkbox' });
 		dontShowContainer.style.margin = '16px 0';
 		dontShowContainer.style.display = 'flex';
@@ -103,21 +103,21 @@ class ConfirmDeleteModal extends Modal {
 		dontShowContainer.style.gap = '8px';
 
 		const checkbox = dontShowContainer.createEl('input', { type: 'checkbox' });
-		const label = dontShowContainer.createEl('label', { text: 'Больше не показывать это предупреждение' });
+		const label = dontShowContainer.createEl('label', { text: "Don't show this warning again" });
 		label.style.cursor = 'pointer';
 		label.onclick = () => checkbox.click();
 
-		// Кнопки управления
+		// Control buttons
 		const buttonContainer = contentEl.createDiv({ cls: 'modal-button-container' });
 		buttonContainer.style.display = 'flex';
 		buttonContainer.style.justifyContent = 'flex-end';
 		buttonContainer.style.gap = '8px';
 
-		const cancelBtn = buttonContainer.createEl('button', { text: 'Отмена' });
+		const cancelBtn = buttonContainer.createEl('button', { text: 'Cancel' });
 		cancelBtn.onclick = () => this.close();
 
 		const deleteBtn = buttonContainer.createEl('button', { 
-			text: 'Удалить', 
+			text: 'Delete', 
 			cls: 'mod-warning' 
 		});
 
@@ -136,7 +136,7 @@ class ConfirmDeleteModal extends Modal {
 	}
 }
 
-// --- ВКЛАДКА НАСТРОЕК ПЛАГИНА ---
+// --- PLUGIN SETTINGS TAB ---
 class DynamicExplorerSettingTab extends PluginSettingTab {
 	plugin: DynamicExplorerPlugin;
 
@@ -150,8 +150,8 @@ class DynamicExplorerSettingTab extends PluginSettingTab {
 		containerEl.empty();
 
 		new Setting(containerEl)
-			.setName('Показывать предупреждение при удалении')
-			.setDesc('Запрашивать подтверждение перед перемещением файлов или папок в корзину.')
+			.setName('Confirm deletion')
+			.setDesc('Ask for confirmation before moving files or folders to the trash.')
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.confirmDelete)
@@ -163,7 +163,7 @@ class DynamicExplorerSettingTab extends PluginSettingTab {
 	}
 }
 
-// --- ОСНОВНОЙ ВЬЮ ПРОВОДНИКА ---
+// --- MAIN EXPLORER VIEW ---
 class DynamicExplorerView extends ItemView {
 	currentFolder: TFolder | null = null;
 	plugin: DynamicExplorerPlugin;
@@ -182,7 +182,7 @@ class DynamicExplorerView extends ItemView {
 	}
 
 	getDisplayText(): string {
-		return 'Динамический проводник';
+		return 'Dynamic explorer';
 	}
 
 	async onOpen() {
@@ -208,8 +208,7 @@ class DynamicExplorerView extends ItemView {
 		container.empty();
 		container.addClass('dynamic-folder-explorer');
 
-		// Делаем корневой контейнер вьюхи флекс-колонкой, 
-		// чтобы список мог занять всё оставшееся пространство под шапкой
+		// Make root container a flex column so the list can take up all remaining space below header
 		container.style.display = 'flex';
 		container.style.flexDirection = 'column';
 		container.style.height = '100%';
@@ -223,19 +222,19 @@ class DynamicExplorerView extends ItemView {
 
 		if (!this.currentFolder) return;
 
-		// --- ШАПКА ---
+		// --- HEADER ---
 		const headerEl = container.createDiv({ cls: 'nav-header' });
 		headerEl.style.display = 'flex';
 		headerEl.style.alignItems = 'center';
 		headerEl.style.gap = '8px';
 		headerEl.style.padding = '8px';
 		headerEl.style.borderBottom = '1px solid var(--background-modifier-border)';
-		headerEl.style.flexShrink = '0'; // Шапка не сжимается
+		headerEl.style.flexShrink = '0'; // Header won't shrink
 
-		// 1. Кнопка «Вверх»
+		// 1. "Up" button
 		const upBtn = headerEl.createEl('button', { 
 			cls: 'clickable-icon',
-			attr: { 'aria-label': 'На уровень выше' } 
+			attr: { 'aria-label': 'Go up' } 
 		});
 		setIcon(upBtn, 'arrow-left');
 		upBtn.onclick = () => {
@@ -245,9 +244,9 @@ class DynamicExplorerView extends ItemView {
 			}
 		};
 
-		// 2. Название папки / хранилища (в центре)
+		// 2. Folder / vault name (center)
 		const folderNameText = this.currentFolder.isRoot() 
-			? (this.app.vault.getName() || 'Корень хранилища') 
+			? (this.app.vault.getName() || 'Vault root') 
 			: this.currentFolder.name;
 
 		const titleSpan = headerEl.createSpan({ text: folderNameText });
@@ -258,10 +257,10 @@ class DynamicExplorerView extends ItemView {
 		titleSpan.style.whiteSpace = 'nowrap';
 		titleSpan.style.flex = '1';
 
-		// 3. Кнопка «Домой» (прижата вправо)
+		// 3. "Home" button (pinned right)
 		const homeBtn = headerEl.createEl('button', { 
 			cls: 'clickable-icon',
-			attr: { 'aria-label': 'Корень хранилища' } 
+			attr: { 'aria-label': 'Vault root' } 
 		});
 		setIcon(homeBtn, 'home');
 		homeBtn.style.marginLeft = 'auto';
@@ -277,7 +276,7 @@ class DynamicExplorerView extends ItemView {
 		const existingList = container.querySelector('.file-list-container');
 		if (existingList) existingList.remove();
 
-		// Контейнер списка теперь занимает всю оставшуюся высоту под шапкой
+		// List container takes up remaining height below header
 		const listContainer = container.createDiv({ cls: 'file-list-container' });
 		listContainer.style.padding = '8px';
 		listContainer.style.flex = '1';
@@ -285,9 +284,9 @@ class DynamicExplorerView extends ItemView {
 
 		if (!this.currentFolder) return;
 
-		// ПКМ в любой пустой области вызовет контекстное меню создания
+		// Right-click in any empty area opens creation context menu
 		listContainer.oncontextmenu = (e: MouseEvent) => {
-			// Открываем меню только если кликнули по пустому месту, а не по конкретному файлу
+			// Open menu only if clicked on empty space, not a specific file
 			if (e.target === listContainer || (e.target as HTMLElement).classList.contains('tree-item-children')) {
 				e.preventDefault();
 				this.showContextMenu(e, null);
@@ -335,7 +334,7 @@ class DynamicExplorerView extends ItemView {
 
 			itemEl.oncontextmenu = (e: MouseEvent) => {
 				e.preventDefault();
-				e.stopPropagation(); // Предотвращаем всплытие, чтобы срабатывало меню файла, а не общего пространства
+				e.stopPropagation(); // Prevent bubbling so file menu triggers instead of general space menu
 				this.showContextMenu(e, child, textSpan);
 			};
 
@@ -351,17 +350,17 @@ class DynamicExplorerView extends ItemView {
 			? target 
 			: (target instanceof TFile ? target.parent : this.currentFolder) || this.app.vault.getRoot();
 
-		// 1. Создание элементов
+		// 1. Create items
 		menu.addItem((item: MenuItem) => {
-			item.setTitle('Новая заметка')
+			item.setTitle('New note')
 				.setIcon('file-plus')
 				.onClick(async () => {
 					const basePath = currentDir.path === '/' ? '' : `${currentDir.path}/`;
-					let fileName = `${basePath}Без названия.md`;
+					let fileName = `${basePath}Untitled.md`;
 					let counter = 1;
 
 					while (this.app.vault.getAbstractFileByPath(fileName)) {
-						fileName = `${basePath}Без названия ${counter++}.md`;
+						fileName = `${basePath}Untitled ${counter++}.md`;
 					}
 
 					if (currentDir instanceof TFolder && this.currentFolder !== currentDir) {
@@ -382,16 +381,16 @@ class DynamicExplorerView extends ItemView {
 		});
 
 		menu.addItem((item: MenuItem) => {
-			item.setTitle('Новая папка')
+			item.setTitle('New folder')
 				.setIcon('folder-plus')
 				.onClick(async () => {
 					const basePath = currentDir.path === '/' ? '' : `${currentDir.path}/`;
-					let folderName = 'Новая папка';
+					let folderName = 'New folder';
 					let folderPath = `${basePath}${folderName}`;
 					let counter = 1;
 
 					while (this.app.vault.getAbstractFileByPath(folderPath)) {
-						folderName = `Новая папка ${counter++}`;
+						folderName = `New folder ${counter++}`;
 						folderPath = `${basePath}${folderName}`;
 					}
 
@@ -412,12 +411,12 @@ class DynamicExplorerView extends ItemView {
 				});
 		});
 
-		// 2. Переименование (если выбран конкретный объект)
+		// 2. Rename (if specific object selected)
 		if (target && textSpan) {
 			menu.addSeparator();
 
 			menu.addItem((item: MenuItem) => {
-				item.setTitle('Переименовать')
+				item.setTitle('Rename')
 					.setIcon('pencil')
 					.onClick(() => {
 						this.inlineRename(textSpan, target);
@@ -425,12 +424,12 @@ class DynamicExplorerView extends ItemView {
 			});
 		}
 
-		// 3. Удаление — в самом низу и отдельно
+		// 3. Delete - at the bottom separately
 		if (target) {
 			menu.addSeparator();
 
 			menu.addItem((item: MenuItem) => {
-				item.setTitle('Удалить')
+				item.setTitle('Delete')
 					.setIcon('trash')
 					.onClick(() => {
 						const doDelete = async () => {
@@ -484,7 +483,7 @@ class DynamicExplorerView extends ItemView {
 				try {
 					await this.app.fileManager.renameFile(target, newPath);
 				} catch (err) {
-					console.error('Ошибка переименования:', err);
+					console.error('Rename error:', err);
 				}
 			}
 
